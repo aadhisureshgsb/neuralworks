@@ -101,17 +101,4 @@ Each visualizer is a self-contained IIFE that owns its DOM subtree. `main.js` an
 - **Tech:** vanilla JS, the Canvas 2D API for pixel-level visuals (MLP boundary, loss surface, convolution), and inline SVG for the graph. No React, no D3, no build pipeline.
 - **Accessibility / responsiveness:** collapses to a single column on narrow screens; the sidebar becomes a horizontal nav.
 
-## Roadmap / ideas
 
-- [ ] A Transformer / LLM section building on §6 (multi-head attention, positional encoding)
-- [ ] Wire RAG step ④ to a real model endpoint behind an optional API key
-- [x] ~~A build-your-own model playground~~ — shipped in §8
-- [ ] Multi-class output + softmax in the model studio
-- [ ] Dark/light theme toggle
-- [ ] Export the trained model's weights as JSON
-
-Contributions welcome — open an issue or PR.
-
-## License
-
-[MIT](LICENSE) © 2026 Your Name — free to use, learn from, and remix.
