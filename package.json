@@ -1,0 +1,31 @@
+{
+  "name": "neuralworks",
+  "version": "1.0.0",
+  "description": "A hands-on, zero-dependency field guide to how neural networks actually work — interactive visualizers for MLPs, backprop, CNNs, GNNs, attention, and RAG. Built for engineers.",
+  "scripts": {
+    "start": "npx --yes serve .",
+    "dev": "npx --yes serve ."
+  },
+  "keywords": [
+    "neural-networks",
+    "machine-learning",
+    "deep-learning",
+    "visualization",
+    "interactive",
+    "education",
+    "cnn",
+    "gnn",
+    "rag",
+    "attention",
+    "backpropagation",
+    "transformers",
+    "vanilla-js",
+    "canvas"
+  ],
+  "license": "MIT",
+  "private": false,
+  "homepage": "https://github.com/your-username/neuralworks#readme",
+  "dependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

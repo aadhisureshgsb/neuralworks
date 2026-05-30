@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEURALWORKS // a hands-on field guide to neural networks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+<div class="shell">
+<nav class="toc">
+  <div class="brand">NEURALWORKS<small>field guide · v1</small></div>
+  <ol id="tocList">
+    <li><a href="#overview">The mental model</a></li>
+    <li><a href="#neuron">Neurons &amp; networks</a></li>
+    <li><a href="#learn">How they learn</a></li>
+    <li><a href="#learn3d">See it learn · 3D</a></li>
+    <li><a href="#cnn">CNNs / vision</a></li>
+    <li><a href="#gnn">GNNs / graphs</a></li>
+    <li><a href="#attn">Embeddings &amp; attention</a></li>
+    <li><a href="#rag">RAG</a></li>
+    <li><a href="#build">Build your own ⚡</a></li>
+    <li><a href="#cheat">SDE cheat sheet</a></li>
+  </ol>
+  <div class="foot">
+    BUILT FOR ENGINEERS.<br>
+    every panel is live —<br>poke it, break it, learn it.<br><br>
+    no math degree required.
+  </div>
+</nav>
+
+<main>
+<!-- ========== HERO ========== -->
+<section class="hero" id="top">
+  <div class="tag">A hands-on field guide</div>
+  <h1 class="big">How neural<br>nets <em>actually</em><br>work.</h1>
+  <p class="heroline">
+    You ship distributed systems. You already think in pipelines, indexes,
+    queues, and feedback loops. This guide maps neural networks onto concepts
+    you own — then lets you <span style="color:var(--teal)">touch every one of them</span>.
+    Train a model in your browser. Slide a convolution kernel. Watch a graph gossip.
+    Run a real retrieval pipeline. No frameworks, no hand-waving.
+  </p>
+  <div class="chips">
+    <div class="chip">01 <b>MLP</b></div>
+    <div class="chip">02 <b>Backprop</b></div>
+    <div class="chip">03 <b>3D descent</b></div>
+    <div class="chip">04 <b>CNN</b></div>
+    <div class="chip">05 <b>GNN</b></div>
+    <div class="chip">06 <b>Attention</b></div>
+    <div class="chip">07 <b>RAG</b></div>
+    <div class="chip">08 <b>Build your own</b></div>
+  </div>
+</section>
+
+<!-- ========== 0. OVERVIEW ========== -->
+<section id="overview" class="prose">
+  <div class="tag">00 · the mental model</div>
+  <h2 class="title">A neural net is just a function you fit to data.</h2>
+  <p class="lede">Strip away the hype and a neural network is a big parameterized
+  function <code>f(x; θ) → y</code>. You don't write the logic — you fit the parameters <code>θ</code> until the function does what you want.</p>
+
+  <p>As an engineer, you already know this shape. Think of it as three loops:</p>
+  <ul>
+    <li><b>Inference</b> = a request handler. Input comes in, flows through a fixed set of matrix multiplies, an answer comes out. Deterministic, fast, stateless.</li>
+    <li><b>Training</b> = an optimization loop / CI job. Run inputs through, measure how wrong the output is (the <b>loss</b>), nudge every parameter slightly toward "less wrong," repeat millions of times.</li>
+    <li><b>The parameters (<code>θ</code>)</b> = the build artifact. A trained model is just a few million-to-billion floating-point numbers — the "weights." Shipping a model is shipping that blob.</li>
+  </ul>
+
+  <div class="sde">
+    <div class="ic">SDE&nbsp;LENS</div>
+    <p>The whole field is one idea repeated: <b>stack simple differentiable operations, then use calculus to automatically tune their knobs against a loss.</b> CNNs, GNNs, Transformers — they're all the same training loop with different "layers" (different ways of mixing information). Once you get the loop, every architecture is a variation on <b>how information is allowed to flow</b>.</p>
+  </div>
+
+  <p>That's the entire arc of this guide. We'll build the loop from a single neuron (§1–2), then tour the three big ways people wire neurons together depending on the data: <b>grids/images → CNNs</b> (§3), <b>graphs/relationships → GNNs</b> (§4), and <b>sequences/text → attention &amp; Transformers</b> (§5). Finally we'll assemble those into <b>RAG</b> (§6), the pattern behind most production LLM apps.</p>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 1. NEURON ========== -->
+<section id="neuron" class="prose">
+  <div class="tag">01 · neurons &amp; networks</div>
+  <h2 class="title">One neuron is a weighted sum with a switch.</h2>
+  <p class="lede">A neuron takes inputs, multiplies each by a learned weight, adds them up plus a bias, and squashes the result through an <b>activation function</b>. That's the atom. Everything else is wiring.</p>
+
+  <p>Formally, for inputs <code>x</code> and weights <code>w</code>: <code>output = activation(w·x + b)</code>. The dot product <code>w·x</code> is "how much do I care about each input"; the bias <code>b</code> shifts the threshold; the activation adds the <b>non-linearity</b> that lets stacks of neurons represent curves, not just straight lines.</p>
+
+  <p>Without a non-linear activation, stacking layers is pointless — a chain of matrix multiplies collapses into a single matrix. The activation is what makes "deep" meaningful. Here are the common ones; drag to see their shapes:</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">activation explorer</div><div class="dot">f(z)</div></div>
+    <div class="body">
+      <div class="seg" id="actSeg">
+        <button class="on" data-a="relu">ReLU</button>
+        <button data-a="sigmoid">Sigmoid</button>
+        <button data-a="tanh">Tanh</button>
+        <button data-a="gelu">GELU</button>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <canvas id="actCanvas" width="760" height="240"></canvas>
+      </div>
+      <p id="actDesc" class="hint"></p>
+    </div>
+  </div>
+
+  <p>Now wire many neurons into layers — a <b>Multi-Layer Perceptron (MLP)</b>. Each layer is a matrix multiply + activation. Stacked layers learn increasingly abstract features. Below is a real MLP, training live in your browser with actual backpropagation, learning to separate two interleaving "moons" of data — a shape no straight line can split.</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">live MLP trainer · two-moons</div><div class="dot" id="mlpStatus">idle</div></div>
+    <div class="body">
+      <div class="row">
+        <div style="flex:0 0 auto"><canvas id="mlpCanvas" width="400" height="400"></canvas></div>
+        <div class="col">
+          <p style="margin-top:0;font-size:14.5px;color:var(--mut)">The background is the network's <b style="color:var(--ink)">decision surface</b> — teal vs rose is what it predicts for every point in the plane. Dots are the training data. Hit <b style="color:var(--ink)">Train</b> and watch the boundary bend itself around the data as gradient descent tunes the weights.</p>
+          <div class="ctrls">
+            <div class="ctrl">hidden units <span class="val" id="huVal">8</span>
+              <input type="range" id="hu" min="2" max="24" value="8" step="1"></div>
+            <div class="ctrl">learn rate <span class="val" id="lrVal">0.30</span>
+              <input type="range" id="lr" min="1" max="100" value="30" step="1"></div>
+            <div class="ctrl">activation
+              <select id="mlpAct"><option value="tanh">tanh</option><option value="relu">relu</option></select></div>
+          </div>
+          <div class="ctrls" style="margin-top:14px">
+            <button class="btn primary" id="mlpRun">▶ Train</button>
+            <button class="btn" id="mlpStep">Step ×50</button>
+            <button class="btn" id="mlpReset">↺ Reset</button>
+          </div>
+          <div class="readout"><span>epoch <b id="mlpEpoch">0</b></span><span>loss <b id="mlpLoss">—</b></span><span>acc <b id="mlpAcc">—</b></span></div>
+        </div>
+      </div>
+      <p class="hint">Try: drop learn rate to ~0.05 (slow crawl) vs crank it to 1.0 (jittery / may diverge). Fewer hidden units = the boundary can't bend enough (underfitting).</p>
+    </div>
+  </div>
+  <div class="sde">
+    <div class="ic">SDE&nbsp;LENS</div>
+    <p>An MLP layer is literally <code>y = activation(W @ x + b)</code> — a GEMM (matrix multiply) plus an elementwise op. This is why GPUs matter: training is billions of these multiplies, and they parallelize perfectly. "Bigger model" mostly means "bigger matrices."</p>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 2. LEARNING ========== -->
+<section id="learn" class="prose">
+  <div class="tag">02 · how they learn</div>
+  <h2 class="title">Learning = rolling downhill on a loss surface.</h2>
+  <p class="lede">Training has two halves: <b>backpropagation</b> computes which direction reduces error for every weight, and <b>gradient descent</b> takes a small step that way. Repeat. That's it.</p>
+
+  <p>Picture the loss as a landscape where altitude = "how wrong the model is," and the coordinates are the weights. <b>The gradient is the slope</b> — the steepest-uphill direction. So we step the <em>opposite</em> way (downhill) by a small amount called the <b>learning rate</b>. Backprop is just the chain rule from calculus, run efficiently backward through the layers to get that slope for every weight at once.</p>
+
+  <p>The learning rate is the one knob everyone fights with. Too small: glacial. Too big: you overshoot the valley and bounce out. Click anywhere on the surface to drop a marble and watch it descend:</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">gradient descent · loss surface</div><div class="dot">click to drop a marble</div></div>
+    <div class="body">
+      <div class="row">
+        <div style="flex:0 0 auto"><canvas id="gdCanvas" width="420" height="420"></canvas></div>
+        <div class="col">
+          <p style="margin-top:0;font-size:14.5px;color:var(--mut)">Brighter = lower loss (the goal). The marble follows the negative gradient toward a minimum. Watch how learning rate changes whether it converges smoothly, crawls, or overshoots.</p>
+          <div class="ctrls">
+            <div class="ctrl">learn rate <span class="val" id="gdLrVal">0.10</span>
+              <input type="range" id="gdLr" min="1" max="120" value="10" step="1"></div>
+            <div class="ctrl">surface
+              <select id="gdSurf"><option value="bowl">simple bowl</option><option value="saddle">saddle + valley</option><option value="bumpy">bumpy (local minima)</option></select></div>
+          </div>
+          <div class="ctrls" style="margin-top:14px">
+            <button class="btn" id="gdReset">↺ New marble</button>
+          </div>
+          <div class="readout"><span>step <b id="gdStep">0</b></span><span>loss <b id="gdLoss">—</b></span></div>
+        </div>
+      </div>
+      <p class="hint">On "bumpy," drop marbles in different spots — they settle in different valleys. That's <b>local minima</b>: real loss landscapes are wild, which is why initialization and optimizer tricks (momentum, Adam) matter.</p>
+    </div>
+  </div>
+  <div class="sde">
+    <div class="ic">SDE&nbsp;LENS</div>
+    <p>You never hand-derive these gradients. Frameworks (PyTorch, JAX) build a <b>computation graph</b> of every operation and auto-differentiate it — same idea as a build dependency graph, but it propagates derivatives backward instead of artifacts forward. Your job is to define the forward pass; the gradient comes free.</p>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 3D LEARN ========== -->
+<section id="learn3d" class="prose">
+  <div class="tag">03 · see it learn · 3D</div>
+  <h2 class="title">The same descent, in three dimensions — live.</h2>
+  <p class="lede">§2 showed the loss surface from above. Here it is as an actual 3D landscape, rendered in real time and rotating continuously. The glowing marble is the optimizer; watch it find its way downhill, settle, and respawn — forever.</p>
+
+  <p>This isn't a recorded clip — it's computed frame-by-frame in your browser, so it reacts to you. <b>Drag to orbit</b> the camera. Change the learning rate and watch the marble go from a careful crawl to reckless overshooting. Switch surfaces to feel the difference between a clean valley and a landscape full of traps.</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">live 3D loss landscape · continuous descent</div><div class="dot">drag to orbit</div></div>
+    <div class="body">
+      <canvas id="s3dCanvas" width="820" height="420" style="cursor:grab"></canvas>
+      <div class="ctrls" style="margin-top:14px">
+        <div class="ctrl">learn rate <span class="val" id="s3dLrVal">0.10</span>
+          <input type="range" id="s3dLr" min="1" max="80" value="10" step="1"></div>
+        <div class="ctrl">landscape
+          <select id="s3dSurf"><option value="valley">smooth valley</option><option value="bowl">simple bowl</option><option value="ridges">rugged ridges</option></select></div>
+        <button class="btn" id="s3dNew">↺ New marble</button>
+        <div class="readout" style="margin:0"><span>step <b id="s3dStep">0</b></span><span>loss <b id="s3dLoss">—</b></span></div>
+      </div>
+      <p class="hint">On <b>rugged ridges</b>, marbles dropped in different spots get stuck in different valleys — a vivid picture of why a high-dimensional model's final weights depend on where it started.</p>
+    </div>
+  </div>
+  <div class="sde">
+    <div class="ic">SDE&nbsp;LENS</div>
+    <p>A real network has millions of weights, so its true loss surface lives in millions of dimensions — impossible to draw. We're showing a faithful 2-parameter slice. The intuition transfers exactly: training is just this marble, rolling downhill, in a space too big to picture.</p>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 4. CNN ========== -->
+<section id="cnn" class="prose">
+  <div class="tag">04 · CNNs · vision</div>
+  <h2 class="title">CNNs slide one tiny filter over the whole image.</h2>
+  <p class="lede">An image is a grid where nearby pixels are related. A <b>Convolutional Neural Network</b> exploits that: instead of one giant weight per pixel, it learns a small <b>kernel</b> (e.g. 3×3) and slides it across every position, reusing the same weights everywhere.</p>
+
+  <p>Each kernel is a little pattern detector. Slide it over the image computing a weighted sum at each spot, and you get a <b>feature map</b> — a heatmap of "where did this pattern appear." Early layers learn edges and textures; stacking them builds up to shapes, then objects. Two ideas make this cheap and powerful:</p>
+  <ul>
+    <li><b>Parameter sharing</b> — the same 9 numbers detect a vertical edge anywhere in the image. Massively fewer weights than a dense layer (a 3×3 kernel is 9 numbers; a dense layer over a 224×224 image is ~50k <em>per neuron</em>).</li>
+    <li><b>Translation invariance</b> — a cat in the corner fires the same detectors as a cat in the center, so the network doesn't relearn "cat" for every position.</li>
+  </ul>
+
+  <p><b>Draw your own input below</b> — sketch a letter, a shape, anything (adjust the brush, or erase). Or <b>upload an image</b> and watch it get downsampled and filtered. Pick a kernel and the feature map on the right updates live; the moving box is the kernel scanning each position. Try drawing a thick shape and switching between the Sobel filters to see horizontal vs. vertical edges light up separately.</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">convolution playground · your input</div><div class="dot" id="convK">edge detect</div></div>
+    <div class="body">
+      <div class="row" style="align-items:center;justify-content:center">
+        <div style="text-align:center">
+          <div class="hint" style="margin:0 0 8px">INPUT · draw or upload</div>
+          <canvas id="convIn" width="242" height="242" style="cursor:crosshair;touch-action:none"></canvas>
+        </div>
+        <div style="font-family:var(--mono);color:var(--teal);font-size:26px;align-self:center">✳</div>
+        <div style="text-align:center">
+          <div class="hint" style="margin:0 0 8px">KERNEL 3×3</div>
+          <div id="kernelGrid" style="display:grid;grid-template-columns:repeat(3,46px);gap:4px"></div>
+        </div>
+        <div style="font-family:var(--mono);color:var(--teal);font-size:26px;align-self:center">→</div>
+        <div style="text-align:center">
+          <div class="hint" style="margin:0 0 8px">FEATURE MAP</div>
+          <canvas id="convOut" width="242" height="242"></canvas>
+        </div>
+      </div>
+      <div class="ctrls" style="margin-top:18px;justify-content:center">
+        <div class="ctrl">kernel
+          <select id="convPreset">
+            <option value="edge">edge detect (laplacian)</option>
+            <option value="sobelx">sobel — vertical edges</option>
+            <option value="sobely">sobel — horizontal edges</option>
+            <option value="sharpen">sharpen</option>
+            <option value="blur">blur (box)</option>
+            <option value="emboss">emboss</option>
+            <option value="identity">identity</option>
+          </select></div>
+        <div class="ctrl">brush <span class="val" id="convBrushV">1</span>
+          <input type="range" id="convBrush" min="1" max="4" value="1" step="1"></div>
+        <button class="btn" id="convErase">⌫ eraser</button>
+        <button class="btn" id="convClear">↺ clear</button>
+        <button class="btn" id="convExample">load 'A'</button>
+        <label class="btn" for="convUpload" style="display:inline-flex;align-items:center">⬆ upload image
+          <input type="file" id="convUpload" accept="image/*" style="display:none"></label>
+        <button class="btn" id="convDemo">▶ animate scan</button>
+      </div>
+      <p class="hint">The kernel cells are editable — click a number and type your own values to invent a detector. A real CNN <b>learns</b> these 9 numbers automatically via the §2 training loop, then stacks dozens of them.</p>
+    </div>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 4. GNN ========== -->
+<section id="gnn" class="prose">
+  <div class="tag">05 · GNNs · graphs</div>
+  <h2 class="title">GNNs let nodes gossip with their neighbors.</h2>
+  <p class="lede">Lots of data isn't a grid — it's a graph: social networks, dependency trees, molecules, knowledge bases, your service mesh. A <b>Graph Neural Network</b> learns by having each node repeatedly <b>aggregate messages from its neighbors</b>.</p>
+
+  <p>One GNN layer = one round of message passing: every node looks at its neighbors, combines their feature vectors (sum/mean/max), and updates itself. After <b>k</b> layers, each node has absorbed information from everything within <b>k hops</b>. Stacking layers grows each node's "receptive field" outward through the graph.</p>
+
+  <div class="sde">
+    <div class="ic">SDE&nbsp;LENS</div>
+    <p>If you've implemented a <b>gossip protocol</b> or epidemic broadcast, you already understand message passing. Each round, state diffuses one hop further. A GNN just makes the aggregation step <em>learnable</em> — the network learns <em>how</em> to weight and combine neighbor messages instead of plain averaging.</p>
+  </div>
+
+  <p>Below: each node holds a value (its color/brightness). <b>Click a node to inject a signal</b>, then run propagation rounds and watch it diffuse outward through the edges — exactly how a node's representation gets shaped by its neighborhood.</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">message passing · mean aggregation</div><div class="dot" id="gnnRound">round 0</div></div>
+    <div class="body">
+      <svg id="gnnSvg" class="gcanvas" viewBox="0 0 600 360"></svg>
+      <div class="ctrls" style="margin-top:14px;justify-content:center">
+        <button class="btn primary" id="gnnProp">▶ Propagate 1 round</button>
+        <button class="btn" id="gnnAuto">⟳ Auto ×6</button>
+        <button class="btn" id="gnnReset">↺ Reset signal</button>
+        <div class="ctrl">aggregation
+          <select id="gnnAgg"><option value="mean">mean</option><option value="sum">sum</option><option value="max">max</option></select></div>
+      </div>
+      <p class="hint">Inject signal on one node, propagate, and notice how far it reaches after N rounds = N hops. After enough rounds everything converges (<b>over-smoothing</b>) — why GNNs are usually shallow (2–4 layers).</p>
+    </div>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 5. ATTENTION ========== -->
+<section id="attn" class="prose">
+  <div class="tag">06 · embeddings &amp; attention</div>
+  <h2 class="title">Meaning is a vector. Attention is who-looks-at-whom.</h2>
+  <p class="lede">Text first becomes <b>embeddings</b>: every token maps to a vector, positioned so that similar meanings sit close together. Then <b>attention</b> — the engine of Transformers and LLMs — lets each token pull information from the tokens most relevant to it.</p>
+
+  <p><b>Embeddings</b> turn words into geometry. "King" and "queen" land near each other; "GPU" lands near "compute." Distance ≈ semantic similarity, usually measured by <b>cosine similarity</b> (the angle between vectors). This is the foundation for search, recommendations, and the retrieval in RAG. Hover or tap a word to see its nearest neighbors:</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">embedding space · 2D projection</div><div class="dot">hover a token</div></div>
+    <div class="body">
+      <canvas id="embCanvas" width="820" height="360" style="cursor:pointer"></canvas>
+      <p id="embReadout" class="hint">Nearest neighbors appear here.</p>
+    </div>
+  </div>
+
+  <p><b>Self-attention</b> is the breakthrough behind Transformers. Each token emits a <b>query</b> ("what am I looking for?") and a <b>key</b> ("what do I offer?"). Compare every query to every key and you get an attention matrix: how much each token should listen to each other token. The token then pulls a weighted blend of all <b>values</b>. Crucially, every token does this in parallel — no sequential bottleneck, which is why Transformers train so well on GPUs.</p>
+
+  <p>Click a token below (the <b>query</b>) to light up which other tokens it attends to most:</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">self-attention · who attends to whom</div><div class="dot" id="attnQ">— select a query —</div></div>
+    <div class="body">
+      <div id="attnSentence" style="display:flex;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:15px;margin-bottom:6px"></div>
+      <p class="hint">Darker connection + bigger bar = stronger attention. Notice "<b>it</b>" learns to attend to the noun it refers to — that's how the model resolves what "it" means.</p>
+    </div>
+  </div>
+  <div class="sde">
+    <div class="ic">SDE&nbsp;LENS</div>
+    <p>Attention is a <b>soft, content-addressable lookup</b> — like a hashmap where instead of one exact key match you get a weighted blend across all keys by similarity. A Transformer is just stacks of (attention → MLP) blocks. Scale that up on internet-scale text and you get an LLM.</p>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 6. RAG ========== -->
+<section id="rag" class="prose">
+  <div class="tag">07 · RAG · retrieval-augmented generation</div>
+  <h2 class="title">RAG = give the LLM an open-book exam.</h2>
+  <p class="lede">An LLM only knows what was in its training data, frozen at some date, and it can't cite sources. <b>RAG</b> fixes both: before answering, retrieve relevant chunks from <em>your</em> documents and paste them into the prompt. The model answers from the page, not from memory.</p>
+
+  <p>The pipeline has two phases. <b>Indexing (offline):</b> split your docs into chunks, embed each chunk into a vector (§5), store them in a vector database. <b>Query time (online):</b> embed the user's question, find the nearest chunks by similarity, stuff those into the prompt as context, and let the LLM generate a grounded answer.</p>
+
+  <div class="sde">
+    <div class="ic">SDE&nbsp;LENS</div>
+    <p>RAG is a <b>read-through cache for knowledge</b>. The vector store is your index; embedding is the hash function that maps "meaning" to a lookup key; top-k retrieval is the query. The LLM is a smart formatter on top of the rows you fetched. You scale and update knowledge by updating the index — no retraining.</p>
+  </div>
+
+  <p>This demo runs <b>real retrieval</b>: it builds term-frequency vectors over a small corpus and ranks chunks by genuine cosine similarity to your query (the same math as a real vector search, just tiny). Pick or type a question and watch the pipeline light up:</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">live RAG pipeline · real cosine retrieval</div><div class="dot" id="ragStage">idle</div></div>
+    <div class="body">
+      <div class="ctrls">
+        <input type="text" id="ragQuery" placeholder="ask about the knowledge base…" value="How does RAG reduce hallucination?">
+        <button class="btn primary" id="ragRun">▶ Run pipeline</button>
+        <select id="ragPreset">
+          <option value="">— example questions —</option>
+          <option>How does RAG reduce hallucination?</option>
+          <option>What is an embedding used for?</option>
+          <option>Why does a CNN share weights?</option>
+          <option>What do GNN layers do?</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:18px">
+        <div class="col" style="flex:1 1 320px">
+          <div class="hint">① QUERY → embed · ② RETRIEVE top-k by cosine similarity</div>
+          <div id="ragChunks" style="margin-top:10px;display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+        <div class="col" style="flex:1 1 320px">
+          <div class="hint">③ AUGMENT prompt · ④ GENERATE grounded answer</div>
+          <div id="ragPrompt" style="margin-top:10px;font-family:var(--mono);font-size:12px;background:#05100c;border:1px solid var(--line);border-radius:9px;padding:13px;color:var(--mut);white-space:pre-wrap;min-height:120px"></div>
+          <div id="ragAnswer" style="margin-top:10px"></div>
+        </div>
+      </div>
+      <p class="hint">Retrieval here is 100% real math. The final "answer" is templated from the top chunk (no live LLM in this static page) — in production, step ④ is an API call to a model like Claude with the retrieved context in the prompt.</p>
+    </div>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 8. BUILD YOUR OWN ========== -->
+<section id="build" class="prose">
+  <div class="tag">08 · build your own ⚡</div>
+  <h2 class="title">Now build and train a network yourself.</h2>
+  <p class="lede">Everything above, in your hands. Design an architecture two ways — drag sliders in the <b>visual builder</b>, or write it as <b>code</b> — then train it for real on a dataset of your choice and watch the loss fall, the boundary form, and the learned weights light up the wiring.</p>
+
+  <p>This is a complete (if tiny) deep-learning framework running in your browser: real forward passes, real backpropagation, real gradient descent — the exact loop from §2, generalized to any depth and width you specify. Start with the spiral (the hard one): too few neurons and it can't curve enough to separate the arms; add capacity and watch it succeed.</p>
+
+  <div class="viz">
+    <div class="head"><div class="nm">model studio · live training</div><div class="dot" id="pgStatus">ready</div></div>
+    <div class="body">
+      <div class="row">
+        <!-- left: design -->
+        <div class="col" style="flex:1 1 340px">
+          <div class="hint" style="margin-bottom:8px">ARCHITECTURE</div>
+          <canvas id="pgArch" width="380" height="190"></canvas>
+          <div class="seg" id="pgModeSeg" style="margin-top:12px">
+            <button class="on" data-m="visual">▦ Visual builder</button>
+            <button data-m="code">&lt;/&gt; Code</button>
+          </div>
+
+          <div id="pgVisual" style="margin-top:14px">
+            <div id="pgLayers" style="display:flex;flex-direction:column;gap:8px"></div>
+            <button class="btn" id="pgAddLayer" style="margin-top:10px">+ add hidden layer</button>
+            <div class="hint" style="margin-top:8px">input = 2 (x, y) · output = 1 neuron, sigmoid (fixed)</div>
+          </div>
+
+          <div id="pgCode" style="margin-top:14px;display:none">
+            <textarea id="pgCodeArea" spellcheck="false" style="width:100%;height:172px;font-family:var(--mono);font-size:12.5px;line-height:1.5;background:#05100c;color:#e9f1ec;border:1px solid var(--line2);border-radius:9px;padding:12px;resize:vertical"></textarea>
+            <div class="ctrls" style="margin-top:8px">
+              <button class="btn primary" id="pgApply">⟲ Apply code → builder</button>
+              <span id="pgCodeErr" class="mono" style="font-size:11px"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- right: train -->
+        <div class="col" style="flex:1 1 340px">
+          <div class="hint" style="margin-bottom:8px">TRAINING</div>
+          <div class="row" style="gap:12px">
+            <div style="text-align:center"><div class="hint" style="margin:0 0 6px">decision boundary</div>
+              <canvas id="pgBoundary" width="240" height="240"></canvas></div>
+            <div class="col" style="min-width:150px">
+              <div class="hint" style="margin:0 0 6px">loss</div>
+              <canvas id="pgLoss" width="220" height="120"></canvas>
+              <div class="readout" style="margin-top:12px;flex-direction:column;gap:6px">
+                <span>epoch <b id="pgEpoch">0</b></span>
+                <span>loss <b id="pgLossV">—</b></span>
+                <span>accuracy <b id="pgAcc">—</b></span>
+                <span>parameters <b id="pgParams">—</b></span>
+              </div>
+            </div>
+          </div>
+          <div class="ctrls" style="margin-top:14px">
+            <div class="ctrl">dataset
+              <select id="pgDataset"><option value="spiral">spiral</option><option value="moons">moons</option><option value="circle">circle</option><option value="xor">xor</option></select></div>
+            <div class="ctrl">learn rate <span class="val" id="pgLrVal">0.10</span>
+              <input type="range" id="pgLr" min="1" max="120" value="10" step="1"></div>
+          </div>
+          <div class="ctrls" style="margin-top:12px">
+            <button class="btn primary" id="pgTrain">▶ Train</button>
+            <button class="btn" id="pgStep">Step ×30</button>
+            <button class="btn" id="pgReset">↺ Reset</button>
+          </div>
+        </div>
+      </div>
+      <p class="hint">Edge colors in the architecture diagram show <b>learned weights</b> — teal = positive, rose = negative, thickness = magnitude. They start random and organize as the model trains.</p>
+    </div>
+  </div>
+  <div class="sde">
+    <div class="ic">SDE&nbsp;LENS</div>
+    <p>The "Code" tab is a real config-as-code workflow: you declare layers, the parser validates them (try an invalid activation), and it instantiates the network — the same separation between <b>declarative spec</b> and <b>runtime</b> you'd build for any system. Swap in PyTorch's <code>nn.Sequential</code> and the mental model is identical.</p>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ========== 9. CHEAT SHEET ========== -->
+<section id="cheat" class="prose">
+  <div class="tag">09 · the SDE cheat sheet</div>
+  <h2 class="title">Every term, in language you already speak.</h2>
+  <p class="lede">Bookmark this. When the ML terminology flies, map it back to systems concepts you own.</p>
+
+  <table class="gloss">
+    <thead><tr><th>ML term</th><th>What it actually is</th><th>Closest SDE concept</th></tr></thead>
+    <tbody>
+      <tr><td>Weights / θ</td><td>The learned floating-point numbers that define the model</td><td>The build artifact / config blob you deploy</td></tr>
+      <tr><td>Forward pass</td><td>Running input through the network to get output</td><td>A request through your handler chain</td></tr>
+      <tr><td>Loss function</td><td>A number measuring how wrong the output is</td><td>An error metric / objective to minimize</td></tr>
+      <tr><td>Gradient</td><td>Direction + magnitude to change each weight to cut loss</td><td>The slope; partial derivatives of the error</td></tr>
+      <tr><td>Backprop</td><td>Chain rule run backward to get all gradients at once</td><td>Reverse-mode autodiff over a compute DAG</td></tr>
+      <tr><td>Learning rate</td><td>Step size when nudging weights downhill</td><td>A tuning knob; too big diverges, too small crawls</td></tr>
+      <tr><td>Epoch</td><td>One full pass over the training data</td><td>One iteration of the batch job over the dataset</td></tr>
+      <tr><td>Activation</td><td>Non-linear squash after a layer (ReLU, etc.)</td><td>The thing that makes "deep" more than one matrix</td></tr>
+      <tr><td>Convolution</td><td>Sliding a small shared filter across a grid</td><td>A stream/window operator with shared params</td></tr>
+      <tr><td>Message passing</td><td>Nodes aggregating neighbor features each layer</td><td>A gossip / epidemic broadcast round</td></tr>
+      <tr><td>Embedding</td><td>A vector encoding meaning; near = similar</td><td>A learned hash into semantic space</td></tr>
+      <tr><td>Attention</td><td>Weighted blend over tokens by query–key match</td><td>Soft, content-addressable hashmap lookup</td></tr>
+      <tr><td>Transformer</td><td>Stacked attention + MLP blocks</td><td>The architecture behind every modern LLM</td></tr>
+      <tr><td>Vector DB</td><td>Store + nearest-neighbor search over embeddings</td><td>An index optimized for similarity queries</td></tr>
+      <tr><td>RAG</td><td>Retrieve relevant docs, then generate from them</td><td>Read-through cache for knowledge + a formatter</td></tr>
+      <tr><td>Inference</td><td>Using a trained model to make predictions</td><td>Serving / the hot path in production</td></tr>
+      <tr><td>Overfitting</td><td>Memorizing train data, failing on new data</td><td>Tests pass, prod breaks; no generalization</td></tr>
+      <tr><td>Token</td><td>A chunk of text (~¾ of a word) the model reads</td><td>The unit of I/O you're billed per</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:38px;font-family:var(--mono);font-size:12px;color:var(--mut2);letter-spacing:.04em">— end of guide · everything above is live and editable · view source to see exactly how each visualizer works —</p>
+</section>
+
+</main>
+</div>
+
+<script src="src/main.js"></script>
+<script src="src/viz/lib-mlp.js"></script>
+<script src="src/viz/activation.js"></script>
+<script src="src/viz/mlp.js"></script>
+<script src="src/viz/gradient-descent.js"></script>
+<script src="src/viz/surface3d.js"></script>
+<script src="src/viz/convolution.js"></script>
+<script src="src/viz/gnn.js"></script>
+<script src="src/viz/embeddings.js"></script>
+<script src="src/viz/attention.js"></script>
+<script src="src/viz/rag.js"></script>
+<script src="src/viz/playground.js"></script>
+</body>
+</html>
